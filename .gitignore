@@ -1,0 +1,6 @@
+/target
+.rustybottles
+rustybottles.toml
+*.rar
+*.7z
+*.zip

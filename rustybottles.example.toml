@@ -1,0 +1,30 @@
+[settings]
+workdir = "./.rustybottles"
+bottles_root = "~/.var/app/com.usebottles.bottles/data/bottles/bottles"
+default_bottle = "apps"
+
+[extraction_defaults]
+password = "password"
+recursive = true
+recursive_innermost = true # preserves only the innermost extracted directory with executable files
+delete_original = false
+
+[shortcut_defaults]
+enabled = true
+executable_pattern = "*.exe"
+prefer_longest_path = true
+suffix_hash = true
+suffix_date = false
+
+[profiles.rpgmaker]
+bottle = "apps"
+markers = ["www", "Game.rgss3a", "package.json", "manifest.json", "nw.dll"]
+
+shortcut_prefix = "rpgmaker_"
+use_manifest_title = true
+
+[profiles.unity]
+bottle = "apps"
+markers = ["UnityPlayer*.*", "UnityCrashHandler*.*", "MonoBleedingEdge"]
+
+shortcut_prefix = "unity_"
