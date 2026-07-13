@@ -1,12 +1,10 @@
 use anyhow::{Context, Result};
 use clap::Parser;
 use glob::glob;
-use std::{fs, path::PathBuf};
+use std::{env, fs, path::PathBuf};
 
 pub mod archive;
 pub mod config;
-pub mod engine;
-pub mod errors;
 
 #[derive(Parser, Debug)]
 #[command(author, version)]
@@ -24,6 +22,9 @@ struct Args {
 }
 
 fn main() -> Result<()> {
+    if env::var("RUST_LOG").is_err() {
+        unsafe { env::set_var("RUST_LOG", "info") }
+    }
     pretty_env_logger::init();
     let args = Args::parse();
 

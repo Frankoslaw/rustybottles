@@ -1,10 +1,9 @@
+use crate::config::ExtractDefaults;
+use anyhow::Context;
 use std::{
-    fs,
-    io,
+    fs, io,
     path::{Path, PathBuf},
 };
-
-use crate::{config::ExtractDefaults, errors::ExtractionError};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ArchiveType {
@@ -23,12 +22,7 @@ impl ArchiveType {
         }
     }
 
-    fn extract(
-        self,
-        source: &Path,
-        target: &Path,
-        password: Option<&str>,
-    ) -> Result<(), ExtractionError> {
+    fn extract(self, source: &Path, target: &Path, password: Option<&str>) -> anyhow::Result<()> {
         match self {
             Self::Zip => extract_zip(source, target, password),
             Self::SevenZip => extract_7z(source, target, password),
@@ -37,10 +31,7 @@ impl ArchiveType {
     }
 }
 
-pub fn extract_recursive(
-    source: &Path,
-    defaults: &ExtractDefaults,
-) -> Result<PathBuf, ExtractionError> {
+pub fn extract_recursive(source: &Path, defaults: &ExtractDefaults) -> anyhow::Result<PathBuf> {
     if source.is_dir() {
         return Ok(source.to_path_buf());
     }
@@ -54,17 +45,11 @@ pub fn extract_recursive(
         let target = current_archive.with_extension("");
 
         if target.exists() && defaults.force {
-            fs::remove_dir_all(&target).map_err(|e| ExtractionError::Io {
-                path: target.clone(),
-                e,
-            })?;
+            fs::remove_dir_all(&target)?;
         }
 
         if !target.exists() {
-            fs::create_dir_all(&target).map_err(|e| ExtractionError::Io {
-                path: target.clone(),
-                e,
-            })?;
+            fs::create_dir_all(&target)?;
 
             let password = if allow_password {
                 defaults.password.as_deref()
@@ -72,10 +57,13 @@ pub fn extract_recursive(
                 None
             };
 
-            log::info!("Extracting {:?}", current_archive.file_name().unwrap_or_default());
+            log::info!(
+                "Extracting {:?}",
+                current_archive.file_name().unwrap_or_default()
+            );
 
             let archive_type = ArchiveType::from_path(&current_archive)
-                .ok_or_else(|| ExtractionError::UnsupportedFormat(current_archive.clone()))?;
+                .with_context(|| format!("Unsupported archive format: {:?}", current_archive))?;
 
             archive_type.extract(&current_archive, &target, password)?;
         }
@@ -109,14 +97,10 @@ fn find_nested_archive(dir: &Path) -> Option<PathBuf> {
         .find(|path| ArchiveType::from_path(path).is_some())
 }
 
-fn extract_rar(
-    source: &Path,
-    target: &Path,
-    password: Option<&str>,
-) -> Result<(), ExtractionError> {
+fn extract_rar(source: &Path, target: &Path, password: Option<&str>) -> anyhow::Result<()> {
     let archive_path = source
         .to_str()
-        .ok_or(ExtractionError::InvalidPathEncoding)?;
+        .with_context(|| format!("Unsupported archive path: {:?}", source))?;
 
     let archive = if let Some(pwd) = password {
         unrar::Archive::with_password(archive_path, pwd.as_bytes())
@@ -124,111 +108,70 @@ fn extract_rar(
         unrar::Archive::new(archive_path)
     };
 
-    let mut archive = archive
-        .open_for_processing()
-        .map_err(|e| ExtractionError::ArchiveSpecific(e.to_string()))?;
+    let mut archive = archive.open_for_processing()?;
 
-    while let Some(header) = archive
-        .read_header()
-        .map_err(|e| ExtractionError::ArchiveSpecific(e.to_string()))?
-    {
+    while let Some(header) = archive.read_header()? {
         let out_path = target.join(&header.entry().filename);
 
         if let Some(parent) = out_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| ExtractionError::Io {
-                path: parent.to_path_buf(),
-                e,
-            })?;
+            fs::create_dir_all(parent)?;
         }
 
         if header.entry().is_file() {
             let out_str = out_path
                 .to_str()
-                .ok_or(ExtractionError::InvalidPathEncoding)?;
+                .with_context(|| format!("Unsupported archive path: {:?}", out_path))?;
 
             archive = header
                 .extract_to(out_str)
-                .map_err(|e| ExtractionError::ArchiveSpecific(e.to_string()))?;
+                .with_context(|| format!("Unsupported archive path: {:?}", out_path))?;
         } else {
             archive = header
                 .skip()
-                .map_err(|e| ExtractionError::ArchiveSpecific(e.to_string()))?;
+                .with_context(|| format!("Unsupported archive path: {:?}", out_path))?;
         }
     }
 
     Ok(())
 }
 
-fn extract_zip(
-    source: &Path,
-    target: &Path,
-    password: Option<&str>,
-) -> Result<(), ExtractionError> {
-    let file = fs::File::open(source).map_err(|e| ExtractionError::Io {
-        path: source.to_path_buf(),
-        e,
-    })?;
+fn extract_zip(source: &Path, target: &Path, password: Option<&str>) -> anyhow::Result<()> {
+    let file = fs::File::open(source)?;
 
-    let mut archive =
-        zip::ZipArchive::new(file).map_err(|e| ExtractionError::ArchiveSpecific(e.to_string()))?;
+    let mut archive = zip::ZipArchive::new(file)?;
 
     for index in 0..archive.len() {
         let mut file = if let Some(password) = password {
-            archive.by_index_decrypt(index, password.as_bytes()).map_err(|_| {
-                ExtractionError::DecryptionFailed {
-                    path: source.to_path_buf(),
-                }
-            })?
+            archive.by_index_decrypt(index, password.as_bytes())?
         } else {
-            archive
-                .by_index(index)
-                .map_err(|e| ExtractionError::ArchiveSpecific(e.to_string()))?
+            archive.by_index(index)?
         };
 
         let out_path = target.join(file.mangled_name());
 
         if file.is_dir() {
-            fs::create_dir_all(&out_path).map_err(|e| ExtractionError::Io {
-                path: out_path,
-                e,
-            })?;
+            fs::create_dir_all(&out_path)?;
             continue;
         }
 
         if let Some(parent) = out_path.parent() {
-            fs::create_dir_all(parent).map_err(|e| ExtractionError::Io {
-                path: parent.to_path_buf(),
-                e,
-            })?;
+            fs::create_dir_all(parent)?;
         }
 
-        let mut outfile = fs::File::create(&out_path).map_err(|e| ExtractionError::Io {
-            path: out_path.clone(),
-            e,
-        })?;
-
-        io::copy(&mut file, &mut outfile).map_err(| e| ExtractionError::Io {
-            path: out_path,
-            e,
-        })?;
+        let mut outfile = fs::File::create(&out_path)?;
+        io::copy(&mut file, &mut outfile)?;
     }
 
     Ok(())
 }
 
-fn extract_7z(
-    source: &Path,
-    target: &Path,
-    password: Option<&str>,
-) -> Result<(), ExtractionError> {
+fn extract_7z(source: &Path, target: &Path, password: Option<&str>) -> anyhow::Result<()> {
     match password {
         Some(password) => {
-            sevenz_rust2::decompress_file_with_password(source, target, password.into())
-                .map_err(|e| ExtractionError::ArchiveSpecific(e.to_string()))?;
+            sevenz_rust2::decompress_file_with_password(source, target, password.into())?;
         }
         None => {
-            sevenz_rust2::decompress_file(source, target)
-                .map_err(|e| ExtractionError::ArchiveSpecific(e.to_string()))?;
+            sevenz_rust2::decompress_file(source, target)?;
         }
     }
 

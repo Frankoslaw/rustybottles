@@ -838,7 +838,6 @@ dependencies = [
  "serde",
  "sevenz-rust2",
  "shellexpand",
- "thiserror",
  "toml",
  "unrar",
  "uuid",
