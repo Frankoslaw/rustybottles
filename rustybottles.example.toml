@@ -1,30 +1,36 @@
-[settings]
-workdir = "./.rustybottles"
-bottles_root = "~/.var/app/com.usebottles.bottles/data/bottles/bottles"
-default_bottle = "apps"
-
-[extraction_defaults]
-password = "password"
-recursive = true
-recursive_innermost = true # preserves only the innermost extracted directory with executable files
+[app]
+workdir = "./.rustybottles" # default ~/.rustybottles
+cleanup_workdir = false
+source_strategy = "copy" # copy, move or none
 delete_original = false
 
-[shortcut_defaults]
-enabled = true
-executable_pattern = "*.exe"
-prefer_longest_path = true
-suffix_hash = true
-suffix_date = false
+[extract]
+force = true
+password = "password"
+extract_recursive = true
+extract_until = "executable" # executable, noarchives, maxdepth
+use_innermost = true
 
-[profiles.rpgmaker]
-bottle = "apps"
-markers = ["www", "Game.rgss3a", "package.json", "manifest.json", "nw.dll"]
+[executable]
+search_recursive = false
+search_pattern = "*.exe"
+use_longest_name = true
 
-shortcut_prefix = "rpgmaker_"
-use_manifest_title = true
+[bottles]
+root = "~/.var/app/com.usebottles.bottles/data/bottles/bottles"
+bottle = "games-unsafe-rpgmaker"
+default_install_path = "drive_c/users/Public/Documents/games-unsafe-rpgmaker"
+create_shortcut = true
+shortcut_tmpl = "{game_name} (rustbottles) ({date})"
 
-[profiles.unity]
-bottle = "apps"
-markers = ["UnityPlayer*.*", "UnityCrashHandler*.*", "MonoBleedingEdge"]
+[overrides.rpgmaker]
+search_files = ["www", "Game.rgss3a", "package.json", "manifest.json"]
+search_recursive = false
 
-shortcut_prefix = "unity_"
+[overrides.rpgmaker.bottles]
+bottle = "games-unsafe-rpgmaker"
+install_path = "drive_c/users/Public/Documents/games-unsafe-rpgmaker"
+
+[overrides.unity]
+search_files = ["UnityPlayer*.*", "UnityCrashHandler*.*", "MonoBleedingEdge"]
+search_recursive = false

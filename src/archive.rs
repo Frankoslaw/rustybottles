@@ -1,9 +1,16 @@
-use crate::config::ExtractDefaults;
 use anyhow::Context;
 use std::{
     fs, io,
     path::{Path, PathBuf},
 };
+
+#[derive(Debug, Clone, Default)]
+pub struct ExtractOptions<'a> {
+    pub force: bool,
+    pub password: Option<&'a str>,
+    pub extract_recursive: bool,
+    pub use_innermost: bool,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ArchiveType {
@@ -31,7 +38,7 @@ impl ArchiveType {
     }
 }
 
-pub fn extract_recursive(source: &Path, defaults: &ExtractDefaults) -> anyhow::Result<PathBuf> {
+pub fn extract_recursive(source: &Path, options: &ExtractOptions) -> anyhow::Result<PathBuf> {
     if source.is_dir() {
         return Ok(source.to_path_buf());
     }
@@ -44,7 +51,7 @@ pub fn extract_recursive(source: &Path, defaults: &ExtractDefaults) -> anyhow::R
     loop {
         let target = current_archive.with_extension("");
 
-        if target.exists() && defaults.force {
+        if target.exists() && options.force {
             fs::remove_dir_all(&target)?;
         }
 
@@ -52,7 +59,7 @@ pub fn extract_recursive(source: &Path, defaults: &ExtractDefaults) -> anyhow::R
             fs::create_dir_all(&target)?;
 
             let password = if allow_password {
-                defaults.password.as_deref()
+                options.password
             } else {
                 None
             };
@@ -72,7 +79,7 @@ pub fn extract_recursive(source: &Path, defaults: &ExtractDefaults) -> anyhow::R
         last_output = Some(target.clone());
         allow_password = false;
 
-        if defaults.recursive {
+        if options.extract_recursive {
             if let Some(next_archive) = find_nested_archive(&target) {
                 current_archive = next_archive;
                 continue;
@@ -82,7 +89,7 @@ pub fn extract_recursive(source: &Path, defaults: &ExtractDefaults) -> anyhow::R
         break;
     }
 
-    Ok(if defaults.recursive_innermost {
+    Ok(if options.use_innermost {
         last_output.unwrap_or_else(|| source.to_path_buf())
     } else {
         first_output.unwrap_or_else(|| source.to_path_buf())

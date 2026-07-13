@@ -4,3 +4,6 @@ rustybottles.toml
 *.rar
 *.7z
 *.zip
+
+.idea
+.vscode
