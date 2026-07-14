@@ -1,16 +1,8 @@
 use anyhow::Context;
 use std::{
     fs, io,
-    path::{Path, PathBuf},
+    path::Path,
 };
-
-#[derive(Debug, Clone, Default)]
-pub struct ExtractOptions<'a> {
-    pub force: bool,
-    pub password: Option<&'a str>,
-    pub extract_recursive: bool,
-    pub use_innermost: bool,
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ArchiveType {
@@ -28,80 +20,21 @@ impl ArchiveType {
             _ => None,
         }
     }
-
-    fn extract(self, source: &Path, target: &Path, password: Option<&str>) -> anyhow::Result<()> {
-        match self {
-            Self::Zip => extract_zip(source, target, password),
-            Self::SevenZip => extract_7z(source, target, password),
-            Self::Rar => extract_rar(source, target, password),
-        }
-    }
 }
 
-pub fn extract_recursive(source: &Path, options: &ExtractOptions) -> anyhow::Result<PathBuf> {
-    if source.is_dir() {
-        return Ok(source.to_path_buf());
-    }
-
-    let mut current_archive = source.to_path_buf();
-    let mut first_output: Option<PathBuf> = None;
-    let mut last_output: Option<PathBuf> = None;
-    let mut allow_password = true;
-
-    loop {
-        let target = current_archive.with_extension("");
-
-        if target.exists() && options.force {
-            fs::remove_dir_all(&target)?;
-        }
-
-        if !target.exists() {
-            fs::create_dir_all(&target)?;
-
-            let password = if allow_password {
-                options.password
-            } else {
-                None
-            };
-
-            log::info!(
-                "Extracting {:?}",
-                current_archive.file_name().unwrap_or_default()
-            );
-
-            let archive_type = ArchiveType::from_path(&current_archive)
-                .with_context(|| format!("Unsupported archive format: {:?}", current_archive))?;
-
-            archive_type.extract(&current_archive, &target, password)?;
-        }
-
-        first_output.get_or_insert_with(|| target.clone());
-        last_output = Some(target.clone());
-        allow_password = false;
-
-        if options.extract_recursive {
-            if let Some(next_archive) = find_nested_archive(&target) {
-                current_archive = next_archive;
-                continue;
-            }
-        }
-
-        break;
-    }
-
-    Ok(if options.use_innermost {
-        last_output.unwrap_or_else(|| source.to_path_buf())
-    } else {
-        first_output.unwrap_or_else(|| source.to_path_buf())
-    })
+pub fn is_archive(path: &Path) -> bool {
+    ArchiveType::from_path(path).is_some()
 }
 
-fn find_nested_archive(dir: &Path) -> Option<PathBuf> {
-    fs::read_dir(dir)
-        .ok()?
-        .filter_map(Result::ok)
-        .map(|entry| entry.path())
-        .find(|path| ArchiveType::from_path(path).is_some())
+pub fn extract(source: &Path, target: &Path, password: Option<&str>) -> anyhow::Result<()> {
+    let archive_type = ArchiveType::from_path(source)
+        .with_context(|| format!("Unsupported archive format: {:?}", source))?;
+
+    match archive_type {
+        ArchiveType::Zip => extract_zip(source, target, password),
+        ArchiveType::SevenZip => extract_7z(source, target, password),
+        ArchiveType::Rar => extract_rar(source, target, password),
+    }
 }
 
 fn extract_rar(source: &Path, target: &Path, password: Option<&str>) -> anyhow::Result<()> {
@@ -144,7 +77,6 @@ fn extract_rar(source: &Path, target: &Path, password: Option<&str>) -> anyhow::
 
 fn extract_zip(source: &Path, target: &Path, password: Option<&str>) -> anyhow::Result<()> {
     let file = fs::File::open(source)?;
-
     let mut archive = zip::ZipArchive::new(file)?;
 
     for index in 0..archive.len() {
@@ -181,6 +113,5 @@ fn extract_7z(source: &Path, target: &Path, password: Option<&str>) -> anyhow::R
             sevenz_rust2::decompress_file(source, target)?;
         }
     }
-
     Ok(())
 }

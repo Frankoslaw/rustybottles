@@ -1,14 +1,28 @@
-#![allow(unused)]
 use anyhow::{Context, Result};
 use serde::Deserialize;
 use std::{collections::HashMap, path::PathBuf};
 
-fn default_true() -> bool { true }
-fn default_workdir() -> String { "~/.rustybottles".to_string() }
-fn default_pattern() -> String { "*.exe".to_string() }
-fn default_shortcut() -> String { "{game_name}".to_string() }
+fn default_true() -> bool {
+    true
+}
+fn default_false() -> bool {
+    false
+}
+fn default_workdir() -> String {
+    "~/.rustybottles".to_string()
+}
+fn default_pattern() -> String {
+    "*.exe".to_string()
+}
+fn default_shortcut() -> String {
+    "{game_name}".to_string()
+}
+fn default_library() -> String {
+    "{game_name} ({folder_name}) (managed)".to_string()
+}
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct Config {
     pub app: AppSettings,
 
@@ -28,6 +42,7 @@ pub enum SourceStrategy {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct AppSettings {
     #[serde(rename = "workdir", default = "default_workdir")]
     pub workdir_str: String,
@@ -41,7 +56,7 @@ pub struct AppSettings {
     pub delete_original: bool,
 }
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Default, PartialEq, Eq)]
 #[serde(rename_all = "lowercase")]
 pub enum ExtractUntil {
     #[default]
@@ -51,8 +66,9 @@ pub enum ExtractUntil {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ExtractSettings {
-    #[serde(default = "default_true")]
+    #[serde(default = "default_false")]
     pub force: bool,
     pub password: Option<String>,
     #[serde(default = "default_true")]
@@ -60,13 +76,12 @@ pub struct ExtractSettings {
     #[serde(default)]
     pub extract_until: ExtractUntil,
     #[serde(default = "default_true")]
-    pub use_innermost: bool,
+    pub extract_all_branches: bool,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ExecutableSettings {
-    #[serde(default)]
-    pub search_recursive: bool,
     #[serde(default = "default_pattern")]
     pub search_pattern: String,
     #[serde(default = "default_true")]
@@ -74,6 +89,7 @@ pub struct ExecutableSettings {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BottlesSettings {
     #[serde(rename = "root")]
     pub root_path_str: String,
@@ -81,14 +97,21 @@ pub struct BottlesSettings {
     pub root_path: PathBuf,
     pub bottle: String,
     #[serde(default)]
-    pub default_install_path: Option<PathBuf>,
+    pub install_path: Option<PathBuf>,
     #[serde(default = "default_true")]
     pub create_shortcut: bool,
     #[serde(default = "default_shortcut")]
     pub shortcut_tmpl: String,
+    #[serde(default)]
+    pub create_library: bool,
+    #[serde(default = "default_library")]
+    pub library_tmpl: String,
+    #[serde(default)]
+    pub force: bool,
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct OverrideSettings {
     pub search_files: Vec<PathBuf>,
     #[serde(default)]
@@ -97,6 +120,7 @@ pub struct OverrideSettings {
 }
 
 #[derive(Debug, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct BottlesSettingsOverride {
     #[serde(rename = "root")]
     pub root_str: Option<String>,
@@ -106,6 +130,9 @@ pub struct BottlesSettingsOverride {
     pub install_path: Option<PathBuf>,
     pub create_shortcut: Option<bool>,
     pub shortcut_tmpl: Option<String>,
+    pub create_library: Option<bool>,
+    pub library_tmpl: Option<String>,
+    pub force: Option<bool>,
 }
 
 impl Config {
@@ -128,8 +155,9 @@ impl Config {
             for (engine_name, override_setting) in overrides.iter_mut() {
                 if let Some(ref mut bottles_override) = override_setting.bottles {
                     if let Some(ref root_str) = bottles_override.root_str {
-                        let expanded = Self::expand_path(root_str)
-                            .with_context(|| format!("Failed expanding root path override for engine: {}", engine_name))?;
+                        let expanded = Self::expand_path(root_str).with_context(|| {
+                            format!("Failed expanding root path override for engine: {}", engine_name)
+                        })?;
                         bottles_override.root = Some(expanded);
                     }
                 }
