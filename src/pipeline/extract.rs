@@ -183,7 +183,8 @@ mod tests {
         };
         let exe = ExecutableSettings {
             search_pattern: "*.exe".to_string(),
-            use_longest_name: true,
+            prefer_longest: true,
+            ignore_common: false,
         };
         let config = test_config(settings, Some(exe));
 
@@ -208,7 +209,8 @@ mod tests {
         };
         let exe = ExecutableSettings {
             search_pattern: "*.exe".to_string(),
-            use_longest_name: true,
+            prefer_longest: true,
+            ignore_common: false,
         };
         let config = test_config(settings, Some(exe));
 

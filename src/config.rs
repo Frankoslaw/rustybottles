@@ -84,8 +84,10 @@ pub struct ExtractSettings {
 pub struct ExecutableSettings {
     #[serde(default = "default_pattern")]
     pub search_pattern: String,
-    #[serde(default = "default_true")]
-    pub use_longest_name: bool,
+    #[serde(default = "default_true", alias = "use_longest_name")]
+    pub prefer_longest: bool,
+    #[serde(default)]
+    pub ignore_common: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -108,6 +110,8 @@ pub struct BottlesSettings {
     pub library_tmpl: String,
     #[serde(default)]
     pub force: bool,
+    #[serde(default)]
+    pub rpgmaker_quirks: bool,
 }
 
 #[derive(Debug, Deserialize)]
@@ -133,6 +137,7 @@ pub struct BottlesSettingsOverride {
     pub create_library: Option<bool>,
     pub library_tmpl: Option<String>,
     pub force: Option<bool>,
+    pub rpgmaker_quirks: Option<bool>,
 }
 
 impl Config {

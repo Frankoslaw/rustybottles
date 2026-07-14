@@ -1,7 +1,7 @@
 [app]
 workdir = "./.rustybottles" # default ~/.rustybottles
 cleanup_workdir = true
-source_strategy = "copy" # copy, move or none
+source_strategy = "copy"    # copy, move or none
 delete_original = false
 
 [extract]
@@ -15,13 +15,14 @@ extract_all_branches = true
 
 [executable]
 search_pattern = "*.exe"
-use_longest_name = true
+prefer_longest = true
+ignore_common = true
 
 [bottles]
 force = true
 root = "~/.var/app/com.usebottles.bottles/data/bottles/bottles"
 bottle = "games-unsafe-rpgmaker"
-install_path = "drive_c/users/Public/Documents/games-unsafe-rpgmaker"
+install_path = "drive_c/users/frankoslaw/Documents/games-unsafe-rpgmaker"
 create_shortcut = true
 shortcut_tmpl = "{game_name} ({folder_name}) (managed)"
 create_library = true
@@ -33,7 +34,8 @@ search_recursive = false
 
 [overrides.rpgmaker.bottles]
 bottle = "games-unsafe-rpgmaker"
-install_path = "drive_c/users/Public/Documents/games-unsafe-rpgmaker"
+install_path = "drive_c/users/frankoslaw/Documents/games-unsafe-rpgmaker"
+rpgmaker_quirks = true
 
 [overrides.unity]
 search_files = ["UnityPlayer*.*", "UnityCrashHandler*.*", "MonoBleedingEdge"]
@@ -41,4 +43,4 @@ search_recursive = false
 
 [overrides.unity.bottles]
 bottle = "games-unsafe-unity"
-install_path = "drive_c/users/Public/Documents/games-unsafe-unity"
+install_path = "drive_c/users/frankoslaw/Documents/games-unsafe-unity"

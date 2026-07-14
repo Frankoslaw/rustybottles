@@ -1,6 +1,7 @@
 use crate::bottles::{library, shortcut, template};
 use crate::config::{BottlesSettings, BottlesSettingsOverride, OverrideSettings};
 use crate::pipeline::labels::Labels;
+use crate::bottles::quirks::{self, GameQuirks};
 use crate::util::{copy, hash};
 use anyhow::{Context, Result, bail};
 use std::collections::HashMap;
@@ -16,6 +17,7 @@ pub struct ResolvedBottlesSettings {
     pub create_library: bool,
     pub library_tmpl: String,
     pub force: bool,
+    pub rpgmaker_quirks: bool,
 }
 
 pub fn resolve_settings(
@@ -35,6 +37,7 @@ pub fn resolve_settings(
         create_library: base.create_library,
         library_tmpl: base.library_tmpl.clone(),
         force: base.force,
+        rpgmaker_quirks: base.rpgmaker_quirks,
     };
 
     let Some(overrides) = overrides else {
@@ -81,6 +84,9 @@ fn apply_bottles_override(resolved: &mut ResolvedBottlesSettings, override_cfg: 
     if let Some(force) = override_cfg.force {
         resolved.force = force;
     }
+    if let Some(rpgmaker_quirks) = override_cfg.rpgmaker_quirks {
+        resolved.rpgmaker_quirks = rpgmaker_quirks;
+    }
 }
 
 pub fn install(
@@ -120,6 +126,13 @@ pub fn install(
         .and_then(|s| s.to_str())
         .context("Executable has no file name")?;
 
+    let game_quirks = quirks::resolve(
+        game_folder,
+        exe_stem,
+        folder_name,
+        settings.rpgmaker_quirks,
+    );
+
     let bottle_yml_path = shortcut::bottle_yml_path(&bottle_path);
     let library_yml_path = library::library_yml_path(&settings.root_path)?;
 
@@ -129,7 +142,7 @@ pub fn install(
     if settings.force && settings.create_library {
         let library_name = render_name(
             &settings.library_tmpl,
-            exe_stem,
+            &game_quirks,
             folder_name,
             &dest_folder,
             &dest_exe,
@@ -158,7 +171,7 @@ pub fn install(
         if settings.create_library && !settings.force {
             let library_name = render_name(
                 &settings.library_tmpl,
-                exe_stem,
+                &game_quirks,
                 folder_name,
                 &dest_folder,
                 &dest_exe,
@@ -180,7 +193,7 @@ pub fn install(
     if settings.create_shortcut {
         let shortcut_name = render_name(
             &settings.shortcut_tmpl,
-            exe_stem,
+            &game_quirks,
             folder_name,
             &dest_folder,
             &dest_exe,
@@ -198,7 +211,7 @@ pub fn install(
     if settings.create_library {
         let library_name = render_name(
             &settings.library_tmpl,
-            exe_stem,
+            &game_quirks,
             folder_name,
             &dest_folder,
             &dest_exe,
@@ -208,6 +221,7 @@ pub fn install(
             &bottle_path,
             &settings.bottle,
             &library_name,
+            game_quirks.icon_source.as_ref(),
         )?;
         log::info!("Created library entry '{}' in {:?}", library_name, library_yml_path);
     }
@@ -217,7 +231,7 @@ pub fn install(
 
 fn render_name(
     tmpl: &str,
-    exe_stem: &str,
+    game_quirks: &GameQuirks,
     folder_name: &str,
     dest_folder: &Path,
     dest_exe: &Path,
@@ -235,7 +249,8 @@ fn render_name(
 
     Ok(template::render(
         tmpl,
-        exe_stem,
+        &game_quirks.game_name,
+        &game_quirks.exe_name,
         folder_name,
         folder_hash.as_deref(),
         exe_hash.as_deref(),

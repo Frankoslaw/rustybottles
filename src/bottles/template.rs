@@ -2,14 +2,15 @@ use chrono::Local;
 
 pub fn render(
     template: &str,
-    exe_stem: &str,
+    game_name: &str,
+    exe_name: &str,
     folder_name: &str,
     folder_hash: Option<&str>,
     exe_hash: Option<&str>,
 ) -> String {
     let mut rendered = template
-        .replace("{game_name}", exe_stem)
-        .replace("{exe_name}", exe_stem)
+        .replace("{game_name}", game_name)
+        .replace("{exe_name}", exe_name)
         .replace("{folder_name}", folder_name);
 
     if template.contains("{date}") {
@@ -32,19 +33,27 @@ mod tests {
     #[test]
     fn substitutes_placeholders() {
         let result = render(
-            "{game_name} - {folder_name}",
+            "{game_name} - {exe_name} - {folder_name}",
+            "Cool RPG",
             "Game",
             "folder",
             None,
             None,
         );
-        assert_eq!(result, "Game - folder");
+        assert_eq!(result, "Cool RPG - Game - folder");
+    }
+
+    #[test]
+    fn game_name_and_exe_name_can_differ() {
+        let result = render("{game_name}", "Cool RPG", "Game", "folder", None, None);
+        assert_eq!(result, "Cool RPG");
     }
 
     #[test]
     fn substitutes_hashes() {
         let result = render(
             "{game_name}-{folder_hash}",
+            "Game",
             "Game",
             "folder",
             Some("abc123"),

@@ -1,4 +1,5 @@
 use crate::bottles::library_yml::{self, LibraryEntry};
+use crate::bottles::quirks::IconSource;
 use anyhow::Result;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -31,11 +32,18 @@ pub fn add(
     bottle_dir: &Path,
     bottle_name: &str,
     library_name: &str,
+    icon_source: Option<&IconSource>,
 ) -> Result<()> {
     let mut entries = library_yml::load(path)?;
     let key = Uuid::new_v4();
     let id = Uuid::new_v4();
     let icon = library_yml::icon_path(bottle_dir, library_name);
+
+    if let Some(icon_source) = icon_source {
+        if let Err(err) = crate::bottles::icon::create_library_icon(icon_source, &icon) {
+            log::warn!("Failed to create library icon at {:?}: {}", icon, err);
+        }
+    }
 
     let entry = LibraryEntry {
         key,
