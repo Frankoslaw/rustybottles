@@ -1,5 +1,5 @@
 [app]
-workdir = "./.rustybottles" # default ~/.rustybottles
+workdir = "~/.rustybottles" 
 cleanup_workdir = true
 source_strategy = "copy"    # copy, move or none
 delete_original = false

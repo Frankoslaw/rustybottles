@@ -1,4 +1,4 @@
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use clap::Parser;
 use glob::glob;
 use rustybottles::config::Config;
@@ -23,12 +23,14 @@ fn main() -> Result<()> {
 
     let args = Args::parse();
 
-    let config_path = args.config.unwrap_or_else(|| PathBuf::from("rustybottles.toml"));
+    let config_path = resolve_config_path(args.config)?;
     let config = Config::load(&config_path).context("Failed to load configuration file")?;
 
     for raw_pattern in args.paths_or_globs {
-        let expanded_pattern = shellexpand::full(&raw_pattern)
-            .context(format!("Failed to expand shell variables in: {}", raw_pattern))?;
+        let expanded_pattern = shellexpand::full(&raw_pattern).context(format!(
+            "Failed to expand shell variables in: {}",
+            raw_pattern
+        ))?;
 
         let escaped_pattern = escape_glob_meta_chars(&expanded_pattern);
 
@@ -48,6 +50,31 @@ fn main() -> Result<()> {
     }
 
     Ok(())
+}
+
+fn resolve_config_path(explicit: Option<PathBuf>) -> Result<PathBuf> {
+    if let Some(path) = explicit {
+        return Ok(path);
+    }
+
+    let current_dir = env::current_dir().context("Failed to determine current directory")?;
+    let home_dir = env::var_os("HOME")
+        .filter(|home| !home.is_empty())
+        .map(PathBuf::from)
+        .context("HOME environment variable is not set")?;
+
+    let mut searched = Vec::new();
+    for directory in [&current_dir, &home_dir] {
+        for name in ["rustybottles.toml", ".rustybottles.toml"] {
+            let path = directory.join(name);
+            if path.is_file() {
+                return Ok(path);
+            }
+            searched.push(path);
+        }
+    }
+
+    bail!("No configuration file found")
 }
 
 fn escape_glob_meta_chars(path: &str) -> String {
