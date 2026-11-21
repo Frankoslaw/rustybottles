@@ -1,5 +1,6 @@
 use anyhow::{Context, Result, bail};
-use clap::Parser;
+use clap::{CommandFactory, Parser, ValueHint};
+use clap_complete::{Shell, generate};
 use glob::glob;
 use rustybottles::config::Config;
 use rustybottles::pipeline;
@@ -8,11 +9,14 @@ use std::{env, path::PathBuf};
 #[derive(Parser, Debug)]
 #[command(author, version)]
 struct Args {
-    #[arg(required = true, num_args = 1..)]
+    #[arg(required_unless_present = "generate_completion", num_args = 1.., value_hint = ValueHint::AnyPath)]
     paths_or_globs: Vec<String>,
 
-    #[arg(short, long, value_name = "FILE")]
+    #[arg(short, long, value_name = "FILE", value_hint = ValueHint::FilePath)]
     config: Option<PathBuf>,
+
+    #[arg(long, value_enum, value_name = "SHELL")]
+    generate_completion: Option<Shell>,
 }
 
 fn main() -> Result<()> {
@@ -22,6 +26,16 @@ fn main() -> Result<()> {
     pretty_env_logger::init();
 
     let args = Args::parse();
+
+    if let Some(shell) = args.generate_completion {
+        generate(
+            shell,
+            &mut Args::command(),
+            "rustybottles",
+            &mut std::io::stdout(),
+        );
+        return Ok(());
+    }
 
     let config_path = resolve_config_path(args.config)?;
     let config = Config::load(&config_path).context("Failed to load configuration file")?;
@@ -63,14 +77,12 @@ fn resolve_config_path(explicit: Option<PathBuf>) -> Result<PathBuf> {
         .map(PathBuf::from)
         .context("HOME environment variable is not set")?;
 
-    let mut searched = Vec::new();
     for directory in [&current_dir, &home_dir] {
         for name in ["rustybottles.toml", ".rustybottles.toml"] {
             let path = directory.join(name);
             if path.is_file() {
                 return Ok(path);
             }
-            searched.push(path);
         }
     }
 
